@@ -5,7 +5,7 @@
     "lat": -12.0895,
     "lng": -77.0355,
     "status": "ROJO",
-    "count": 7,
+    "count": 8,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -14,7 +14,7 @@
     "lat": -12.09,
     "lng": -77.037,
     "status": "ROJO",
-    "count": 13,
+    "count": 12,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -23,7 +23,7 @@
     "lat": -12.0915,
     "lng": -77.03,
     "status": "AMARILLO",
-    "count": 3,
+    "count": 5,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -50,7 +50,7 @@
     "lat": -12.0955,
     "lng": -77.0265,
     "status": "ROJO",
-    "count": 7,
+    "count": 6,
     "corridor": "Vía Expresa"
   },
   {
@@ -59,7 +59,7 @@
     "lat": -12.0985,
     "lng": -77.0275,
     "status": "ROJO",
-    "count": 6,
+    "count": 7,
     "corridor": "Vía Expresa"
   },
   {
@@ -67,8 +67,8 @@
     "name": "Av. Camino Real x Av. Santa Cruz",
     "lat": -12.1005,
     "lng": -77.038,
-    "status": "ROJO",
-    "count": 8,
+    "status": "AMARILLO",
+    "count": 5,
     "corridor": "Av. Camino Real"
   }
 ]
