@@ -13,7 +13,7 @@
     "name": "Av. Javier Prado x Av. Petit Thouars",
     "lat": -12.09,
     "lng": -77.037,
-    "status": "AMARILLO",
+    "status": "ROJO",
     "count": 13,
     "corridor": "Av. Javier Prado"
   },
@@ -22,8 +22,8 @@
     "name": "Av. Javier Prado x Vía Expresa",
     "lat": -12.0915,
     "lng": -77.03,
-    "status": "ROJO",
-    "count": 6,
+    "status": "AMARILLO",
+    "count": 3,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -31,8 +31,8 @@
     "name": "Av. Javier Prado x Av. República de Panamá",
     "lat": -12.095894310761613,
     "lng": -77.03132595354344,
-    "status": "AMARILLO",
-    "count": 5,
+    "status": "ROJO",
+    "count": 6,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -41,7 +41,7 @@
     "lat": -12.0885,
     "lng": -77.047,
     "status": "VERDE",
-    "count": 0,
+    "count": 1,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -50,7 +50,7 @@
     "lat": -12.0955,
     "lng": -77.0265,
     "status": "ROJO",
-    "count": 8,
+    "count": 7,
     "corridor": "Vía Expresa"
   },
   {
@@ -68,7 +68,7 @@
     "lat": -12.1005,
     "lng": -77.038,
     "status": "ROJO",
-    "count": 7,
+    "count": 8,
     "corridor": "Av. Camino Real"
   }
 ]
