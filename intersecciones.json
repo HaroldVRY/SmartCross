@@ -1,0 +1,74 @@
+[
+  {
+    "id": "INT-01",
+    "name": "Av. Javier Prado x Av. Arequipa",
+    "lat": -12.0895,
+    "lng": -77.0355,
+    "status": "ROJO",
+    "count": 7,
+    "corridor": "Av. Javier Prado"
+  },
+  {
+    "id": "INT-02",
+    "name": "Av. Javier Prado x Av. Petit Thouars",
+    "lat": -12.09,
+    "lng": -77.037,
+    "status": "AMARILLO",
+    "count": 13,
+    "corridor": "Av. Javier Prado"
+  },
+  {
+    "id": "INT-03",
+    "name": "Av. Javier Prado x Vía Expresa",
+    "lat": -12.0915,
+    "lng": -77.03,
+    "status": "ROJO",
+    "count": 6,
+    "corridor": "Av. Javier Prado"
+  },
+  {
+    "id": "INT-04",
+    "name": "Av. Javier Prado x Av. República de Panamá",
+    "lat": -12.095894310761613,
+    "lng": -77.03132595354344,
+    "status": "AMARILLO",
+    "count": 5,
+    "corridor": "Av. Javier Prado"
+  },
+  {
+    "id": "INT-05",
+    "name": "Av. Javier Prado x Av. Salaverry",
+    "lat": -12.0885,
+    "lng": -77.047,
+    "status": "VERDE",
+    "count": 0,
+    "corridor": "Av. Javier Prado"
+  },
+  {
+    "id": "INT-06",
+    "name": "Av. Canaval y Moreyra x Vía Expresa",
+    "lat": -12.0955,
+    "lng": -77.0265,
+    "status": "ROJO",
+    "count": 8,
+    "corridor": "Vía Expresa"
+  },
+  {
+    "id": "INT-07",
+    "name": "Av. Aramburú x Vía Expresa",
+    "lat": -12.0985,
+    "lng": -77.0275,
+    "status": "ROJO",
+    "count": 6,
+    "corridor": "Vía Expresa"
+  },
+  {
+    "id": "INT-08",
+    "name": "Av. Camino Real x Av. Santa Cruz",
+    "lat": -12.1005,
+    "lng": -77.038,
+    "status": "ROJO",
+    "count": 7,
+    "corridor": "Av. Camino Real"
+  }
+]

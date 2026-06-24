@@ -1,0 +1,245 @@
+/* Import Poppins Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --color-bg: #13294B;       /* Deep Navy Blue */
+  --color-bg-card: rgba(22, 42, 73, 0.7); /* Translucent Navy Card */
+  --color-accent: #21A179;    /* Accent Green */
+  --color-red: #E23B3B;       /* Alert Red */
+  --color-amber: #F4C430;     /* Alert Amber */
+  --color-text-main: #F8FAFC; /* Slate 50 */
+  --color-text-muted: #94A3B8;/* Slate 400 */
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: var(--color-bg);
+  background-image: radial-gradient(circle at 50% 50%, #1e3a67 0%, #13294b 100%);
+  color: var(--color-text-main);
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+/* Glassmorphism Cards */
+.card-glass {
+  background: var(--color-bg-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-glass:hover {
+  border-color: rgba(33, 161, 121, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(33, 161, 121, 0.1);
+}
+
+/* Specific Alerts Glows */
+.card-alert-red {
+  background: rgba(226, 59, 59, 0.12);
+  border: 1px solid rgba(226, 59, 59, 0.4);
+  box-shadow: 0 0 15px rgba(226, 59, 59, 0.2);
+  animation: pulse-border-red 2s infinite ease-in-out;
+}
+
+.card-alert-amber {
+  background: rgba(244, 196, 48, 0.08);
+  border: 1px solid rgba(244, 196, 48, 0.35);
+  box-shadow: 0 0 12px rgba(244, 196, 48, 0.1);
+}
+
+.card-alert-green {
+  background: rgba(33, 161, 121, 0.08);
+  border: 1px solid rgba(33, 161, 121, 0.3);
+}
+
+/* Pulse Animations */
+@keyframes pulse-border-red {
+  0%, 100% {
+    border-color: rgba(226, 59, 59, 0.4);
+    box-shadow: 0 0 15px rgba(226, 59, 59, 0.15);
+  }
+  50% {
+    border-color: rgba(226, 59, 59, 0.85);
+    box-shadow: 0 0 25px rgba(226, 59, 59, 0.4);
+  }
+}
+
+/* Flashing LIVE dot */
+.pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--color-red);
+  box-shadow: 0 0 0 0 rgba(226, 59, 59, 0.7);
+  animation: pulse-dot-anim 1.5s infinite;
+}
+
+@keyframes pulse-dot-anim {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(226, 59, 59, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(226, 59, 59, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(226, 59, 59, 0);
+  }
+}
+
+/* Traffic Light Spheres */
+.light-sphere {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #1e293b; /* Off state */
+  transition: all 0.3s ease;
+  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
+}
+
+.light-sphere::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+}
+
+.light-green {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 15px var(--color-accent), inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.light-amber {
+  background-color: var(--color-amber);
+  box-shadow: 0 0 15px var(--color-amber), inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.light-red {
+  background-color: var(--color-red);
+  box-shadow: 0 0 15px var(--color-red), inset 0 2px 4px rgba(0,0,0,0.3);
+}
+
+/* Custom Scrollbar for Right Panel */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ==========================================
+   LEAFLET MAP & DARK MAP OVERRIDES
+   ========================================== */
+#map {
+  width: 100%;
+  height: 100%;
+  background-color: #111b2d !important;
+}
+
+/* Inverts map colors to generate a dark slate theme */
+.leaflet-tile-container {
+  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(100%);
+}
+
+.leaflet-container {
+  font-family: 'Poppins', sans-serif !important;
+  background-color: #111b2d !important;
+  border: none !important;
+}
+
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: none !important;
+}
+
+.leaflet-bar a {
+  background-color: #1a2c4e !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: #21a179 !important;
+}
+
+/* Custom dark tooltips */
+.leaflet-tooltip {
+  background-color: #1e2a4a !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #f8fafc !important;
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  padding: 4px 8px !important;
+}
+
+.leaflet-tooltip-left:before {
+  border-left-color: #1e2a4a !important;
+}
+.leaflet-tooltip-right:before {
+  border-right-color: #1e2a4a !important;
+}
+
+/* Custom Draggable DIV Icons */
+.marker-pin {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.marker-pin:active {
+  cursor: grabbing;
+  transform: scale(1.2);
+}
+
+.marker-pin-green {
+  background-color: var(--color-accent);
+  box-shadow: 0 0 10px var(--color-accent), 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.marker-pin-amber {
+  background-color: var(--color-amber);
+  box-shadow: 0 0 10px var(--color-amber), 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.marker-pin-red {
+  background-color: var(--color-red);
+  box-shadow: 0 0 12px var(--color-red), 0 2px 8px rgba(0, 0, 0, 0.6);
+  animation: marker-pulse-red 1.8s infinite ease-in-out;
+}
+
+@keyframes marker-pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 8px var(--color-red), 0 2px 8px rgba(0,0,0,0.6);
+  }
+  50% {
+    box-shadow: 0 0 18px var(--color-red), 0 2px 8px rgba(0,0,0,0.6);
+    transform: scale(1.1);
+  }
+}

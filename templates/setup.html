@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurar Zonas (ROIs) — SmartCross</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="p-6 min-h-screen flex flex-col justify-between">
+
+    <!-- HEADER -->
+    <header class="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+        <div class="flex items-center space-x-4">
+            <a href="/interseccion/{{ intersection_id }}" class="bg-slate-800 hover:bg-slate-700 text-white p-2 rounded-lg transition duration-200 border border-white/10">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">Configurar Zonas (ROIs)</h1>
+                <p class="text-xs text-slate-400 font-medium">DEFINICIÓN POLIGONAL DE ACCESOS</p>
+            </div>
+        </div>
+        <div>
+            <span id="status-message" class="text-sm font-medium"></span>
+        </div>
+    </header>
+
+    <!-- MAIN INTERACTIVE WORKSPACE -->
+    <main class="grid grid-cols-12 gap-6 flex-grow mb-6 overflow-hidden">
+        
+        <!-- CANVAS CONTAINER (col-span-8 or 9) -->
+        <section class="col-span-12 lg:col-span-8 bg-black/40 rounded-2xl border border-white/10 p-4 flex flex-col justify-center items-center relative">
+            <div class="w-full h-full flex items-center justify-center overflow-hidden rounded-xl border border-white/5 bg-slate-950">
+                <canvas id="roi-canvas" class="max-w-full max-h-[70vh] cursor-crosshair object-contain"></canvas>
+            </div>
+        </section>
+
+        <!-- CONTROLS PANEL (col-span-4) -->
+        <section class="col-span-12 lg:col-span-4 flex flex-col justify-between bg-black/25 rounded-2xl border border-white/10 p-6">
+            
+            <div class="space-y-6">
+                <!-- Instructions -->
+                <div class="bg-slate-800/40 p-4 rounded-xl border border-white/5">
+                    <h3 class="text-sm font-bold text-white mb-2 flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                        </svg>
+                        <span>Instrucciones</span>
+                    </h3>
+                    <ul class="text-xs text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
+                        <li>Selecciona el semáforo/carril en el selector de abajo.</li>
+                        <li>Haz clic secuencialmente sobre el video para dibujar los vértices del polígono (mínimo 3).</li>
+                        <li>Los puntos se conectan automáticamente en orden de dibujo.</li>
+                        <li>Repite para cada acceso (S1 a S4).</li>
+                        <li>Presiona <strong>Guardar Configuración</strong> al finalizar.</li>
+                    </ul>
+                </div>
+
+                <!-- Selector -->
+                <div class="space-y-2">
+                    <label for="light-selector" class="block text-sm font-semibold text-slate-300">Semáforo Activo</label>
+                    <select id="light-selector" class="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white text-base font-medium focus:outline-none focus:border-emerald-500 transition duration-200">
+                        <option value="S1">S1 — Acceso Norte (Verde)</option>
+                        <option value="S2">S2 — Acceso Sur (Amarillo)</option>
+                        <option value="S3">S3 — Acceso Este (Rojo)</option>
+                        <option value="S4">S4 — Acceso Oeste (Azul)</option>
+                    </select>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="grid grid-cols-1 gap-3">
+                    <button onclick="clearActiveRoi()" class="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 py-3 rounded-xl font-medium transition border border-red-500/20 flex items-center justify-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Limpiar Semáforo Seleccionado</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer Buttons inside control panel -->
+            <div class="pt-6 border-t border-white/10 space-y-3 mt-6 lg:mt-0">
+                <button onclick="saveRois()" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg shadow-emerald-500/20 flex items-center justify-center space-x-2 text-base">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5.5 w-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                    </svg>
+                    <span>Guardar Configuración</span>
+                </button>
+                
+                <a href="/interseccion/{{ intersection_id }}" class="w-full bg-slate-700/60 hover:bg-slate-700 text-slate-200 py-3 rounded-xl font-medium transition text-center block border border-white/10 hover:border-slate-500/50">
+                    Volver a la Intersección
+                </a>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- JS References -->
+    <script src="/static/js/setup.js"></script>
+</body>
+</html>

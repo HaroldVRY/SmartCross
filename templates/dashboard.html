@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartCross — Cuadro de Control del Distrito</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <!-- Custom CSS Styles -->
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="p-6 flex flex-col justify-between h-screen overflow-hidden">
+
+    <!-- HEADER -->
+    <header class="flex items-center justify-between mb-4 pb-4 border-b border-white/10">
+        <div class="flex items-center space-x-4">
+            <div class="bg-gradient-to-r from-emerald-500 to-teal-600 p-2 rounded-lg shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">SmartCross — Cuadro de Control</h1>
+                <p class="text-xs text-slate-400 font-medium tracking-wide">DISTRITO DE SAN ISIDRO · LIMA, PERÚ</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-6">
+            <!-- Instructions info -->
+            <span class="text-xs text-slate-400 font-medium hidden md:inline-block bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg">
+                💡 Arrastra los marcadores en el mapa para ajustar coordenadas
+            </span>
+
+            <!-- LIVE indicator -->
+            <div class="flex items-center space-x-2 bg-black/40 px-3 py-1.5 rounded-full border border-white/5">
+                <span class="pulse-dot"></span>
+                <span id="live-indicator-text" class="text-xs font-bold text-red-500 tracking-wider">CONECTANDO...</span>
+            </div>
+
+            <!-- Clock -->
+            <div class="text-lg font-semibold text-slate-300 bg-black/20 px-3 py-1 rounded border border-white/5" id="header-clock">
+                --:--:--
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTENT GRID -->
+    <main class="grid grid-cols-12 gap-6 flex-grow overflow-hidden mb-2">
+        
+        <!-- MAP PANEL (65%) -->
+        <section class="col-span-12 lg:col-span-8 flex flex-col bg-black/40 rounded-2xl border border-white/10 overflow-hidden relative">
+            <div class="absolute top-4 left-4 z-[1000] bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 pointer-events-none">
+                <span class="text-xs font-semibold text-emerald-400 tracking-wide flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>MAPA DE TRÁFICO EN VIVO</span>
+                </span>
+            </div>
+            
+            <!-- Map Container -->
+            <div id="map" class="w-full h-full"></div>
+        </section>
+
+        <!-- KPI & INFORMATION PANEL (35%) -->
+        <section class="col-span-12 lg:col-span-4 flex flex-col space-y-4 overflow-y-auto pr-1 custom-scrollbar pb-6">
+            
+            <!-- Resumen Distrito Widget -->
+            <div class="card-glass rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wide">Resumen del Distrito</h3>
+                    <span id="nodes-count" class="text-xs font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">8 Intersecciones</span>
+                </div>
+                <!-- Status counts breakdown -->
+                <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div class="bg-emerald-500/10 border border-emerald-500/20 py-2 rounded-lg">
+                        <span class="block text-[10px] text-slate-400 font-medium uppercase">Despejado</span>
+                        <span id="status-verde-count" class="text-lg font-bold text-emerald-400">0</span>
+                    </div>
+                    <div class="bg-amber-500/10 border border-amber-500/20 py-2 rounded-lg">
+                        <span class="block text-[10px] text-slate-400 font-medium uppercase">Cargado</span>
+                        <span id="status-ambar-count" class="text-lg font-bold text-amber-400">0</span>
+                    </div>
+                    <div class="bg-red-500/10 border border-red-500/20 py-2 rounded-lg">
+                        <span class="block text-[10px] text-slate-400 font-medium uppercase">Congesto</span>
+                        <span id="status-rojo-count" class="text-lg font-bold text-red-400">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPIs Cards Grid -->
+            <div class="grid grid-cols-2 gap-4">
+                <div class="card-glass rounded-xl p-3">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Congestión Promedio</span>
+                    <span id="district-congestion-pct" class="text-2xl font-bold text-white block mt-1">0%</span>
+                </div>
+                <div class="card-glass rounded-xl p-3">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Espera Promedio</span>
+                    <span id="district-wait-time" class="text-2xl font-bold text-white block mt-1">0s</span>
+                </div>
+                <div class="card-glass rounded-xl p-3">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Autos Detectados</span>
+                    <span id="district-total-vehicles" class="text-2xl font-bold text-white block mt-1">0</span>
+                </div>
+                <div class="card-glass rounded-xl p-3">
+                    <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Uptime de Red</span>
+                    <span class="text-2xl font-bold text-emerald-400 block mt-1">99.8%</span>
+                </div>
+            </div>
+
+            <!-- Javier Prado Sincronizacion Widget -->
+            <div class="card-glass rounded-xl p-4">
+                <div class="flex items-center justify-between mb-1.5">
+                    <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wide">Coordinación Corredores</h3>
+                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold">ONDA VERDE ACTIVA</span>
+                </div>
+                <p class="text-xs text-slate-300 mb-2">Av. Javier Prado: <span id="sync-counter" class="font-bold">0/5</span> intersecciones alineadas</p>
+                <!-- Progress bar container -->
+                <div class="w-full bg-slate-900 rounded-full h-2">
+                    <div id="sync-progress-bar" class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Top 3 Congestionated Ranking -->
+            <div class="card-glass rounded-xl p-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Ranking de Congestión (Top 3)</h3>
+                <div id="ranking-list" class="space-y-2.5">
+                    <!-- Items populated dynamically -->
+                    <div class="text-xs text-slate-500 italic">Cargando datos...</div>
+                </div>
+            </div>
+
+            <!-- Incident Feed Widget -->
+            <div class="card-glass rounded-xl p-4 flex-grow flex flex-col min-h-[160px]">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Alertas Recientes & Acciones</h3>
+                <div id="alert-feed" class="space-y-2 flex-grow overflow-y-auto max-h-[140px] pr-1 custom-scrollbar text-xs">
+                    <!-- Items populated dynamically -->
+                    <div class="text-slate-500 italic">Esperando eventos...</div>
+                </div>
+            </div>
+
+            <!-- Sparkline Wait Time Trend Widget -->
+            <div class="card-glass rounded-xl p-4">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5">Tendencia de Espera (Última Hora)</h3>
+                <div class="w-full h-16 bg-slate-950/40 rounded-lg border border-white/5 p-1 relative flex items-center justify-center">
+                    <svg id="trend-sparkline" class="w-full h-full overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <path id="sparkline-path" d="" fill="none" stroke="#21A179" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <!-- Tiny labels inside chart -->
+                    <span class="absolute bottom-1 left-1.5 text-[8px] text-slate-500 font-bold uppercase">hace 1h</span>
+                    <span class="absolute bottom-1 right-1.5 text-[8px] text-slate-500 font-bold uppercase">ahora</span>
+                </div>
+            </div>
+
+            <!-- Map Legend -->
+            <div class="card-glass rounded-xl p-3 text-xs flex justify-around items-center">
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3.5 h-3.5 rounded-full border border-white/20 bg-emerald-500 shadow-sm shadow-emerald-500/20"></span>
+                    <span class="text-slate-300 font-medium">Libre</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3.5 h-3.5 rounded-full border border-white/20 bg-amber-500 shadow-sm shadow-amber-500/20"></span>
+                    <span class="text-slate-300 font-medium">Moderado</span>
+                </div>
+                <div class="flex items-center space-x-1.5">
+                    <span class="w-3.5 h-3.5 rounded-full border border-white/20 bg-red-500 shadow-sm shadow-red-500/20 animate-pulse"></span>
+                    <span class="text-slate-300 font-medium">Intenso</span>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Dashboard main script -->
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
