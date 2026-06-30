@@ -9,12 +9,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // Centered in San Isidro, Lima (-12.097, -77.036)
     map = L.map("map", {
         zoomControl: true,
-        attributionControl: false
+        attributionControl: true
     }).setView([-12.097, -77.036], 14);
 
-    // Add standard OpenStreetMap tiles
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19
+    // CARTO Dark Matter tiles: dark theme natively, no invert() hack needed,
+    // free, no API key, and the road network stays clearly legible.
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        subdomains: "abcd",
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributments">CARTO</a>'
     }).addTo(map);
 
     // Start clock updater

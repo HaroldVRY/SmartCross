@@ -35,6 +35,25 @@ const DEFAULT_INTERSECTIONS = [
 // Fallback host if flask server is unreachable (use machine IP or localhost)
 const BACKEND_HOST = "http://192.168.1.100:5000"; // Can be edited in App
 
+// Caso 2 (GLOSA real): cruce inteligente fisico usado en la feria (el mismo que
+// procesa video real en el Modulo 1). Ajustar lat/lng al cruce real antes de la demo.
+const GLOSA_TARGET = { id: "INT-01", lat: -12.0895, lng: -77.0355 };
+// Fase fisica (NS_GREEN/EW_GREEN) durante la cual el acceso del usuario tiene verde.
+// Configurable porque depende de desde que calle se aproxime el usuario en la feria.
+const GLOSA_USER_GREEN_PHASE = "NS_GREEN";
+
+// Real distance in meters between two {lat, lng} points (Haversine formula)
+function haversineMeters(a, b) {
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const h = sinDLat * sinDLat + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * sinDLng * sinDLng;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 // Simulated waypoints for "Recorrido Demo" along Javier Prado (Salaverry to Panamá)
 const DEMO_WAYPOINTS = [
   { lat: -12.0885, lng: -77.0470, speed: 0, nextLight: "INT-02", distance: 1100, lightStatus: "VERDE", lightTimer: 45, label: "Salaverry" },
@@ -66,8 +85,9 @@ const LEAFLET_MAP_HTML = `
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; background: #13294B; }
-    .leaflet-tile-container { filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(100%); }
     .leaflet-container { background-color: #13294B !important; }
+    .leaflet-control-attribution { background-color: rgba(19, 41, 75, 0.75) !important; color: rgba(255,255,255,0.5) !important; font-size: 8px !important; }
+    .leaflet-control-attribution a { color: rgba(255,255,255,0.65) !important; }
     
     /* Glowing circle markers */
     .marker-pin {
@@ -136,9 +156,14 @@ const LEAFLET_MAP_HTML = `
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-12.097, -77.036], 14);
-    
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    var map = L.map('map', { zoomControl: false, attributionControl: true }).setView([-12.097, -77.036], 14);
+
+    // CARTO Dark Matter tiles: dark theme natively, no invert() hack needed.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 20,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+    }).addTo(map);
 
     var markers = {};
     var userMarker = null;
@@ -261,6 +286,7 @@ export default function App() {
   const [intersections, setIntersections] = useState(DEFAULT_INTERSECTIONS);
   const [backendIp, setBackendIp] = useState(BACKEND_HOST);
   const [isConnected, setIsConnected] = useState(false);
+  const [physicalLight, setPhysicalLight] = useState({ phase: "NS_GREEN", seconds_remaining: 0, extended: false });
 
   // Search & Navigation States
   const [searchQuery, setSearchQuery] = useState('');
@@ -294,7 +320,7 @@ export default function App() {
   }, [isVoiceActive]);
 
   // ==========================================
-  // GPS LOCATION TRACKING
+  // GPS LOCATION TRACKING (Caso 1 y Caso 2 - siempre activo, no depende del demo guionado)
   // ==========================================
   useEffect(() => {
     (async () => {
@@ -304,33 +330,30 @@ export default function App() {
         return;
       }
 
-      // Track location unless demo mode overrides it
-      if (!isDemoActive) {
-        Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 1500,
-            distanceInterval: 10,
-          },
-          (loc) => {
-            const lat = loc.coords.latitude;
-            const lng = loc.coords.longitude;
-            // Convert m/s to km/h
-            const kmh = Math.round(loc.coords.speed * 3.6) || 0;
-            
-            setLocation({ lat, lng });
-            setSpeed(kmh);
-            
-            // Inject location to map
-            sendToMap(`drawUserLocation(${lat}, ${lng})`);
-          }
-        );
-      }
+      Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 1500,
+          distanceInterval: 5,
+        },
+        (loc) => {
+          const lat = loc.coords.latitude;
+          const lng = loc.coords.longitude;
+          // Convert m/s to km/h
+          const kmh = Math.round((loc.coords.speed || 0) * 3.6) || 0;
+
+          setLocation({ lat, lng });
+          setSpeed(kmh);
+
+          // Inject location to map
+          sendToMap(`drawUserLocation(${lat}, ${lng})`);
+        }
+      );
     })();
-  }, [isDemoActive]);
+  }, []);
 
   // ==========================================
-  // BACKEND API STATUS POLLING
+  // BACKEND API POLLING (Caso 1: cruces reales / Caso 2: estado real del semaforo)
   // ==========================================
   useEffect(() => {
     const fetchIntersections = () => {
@@ -345,16 +368,62 @@ export default function App() {
           }
         })
         .catch(err => {
-          // Silent fallback to default/local intersections
           setIsConnected(false);
-          sendToMap(`drawIntersections(${JSON.stringify(intersections)})`);
         });
     };
 
     fetchIntersections();
     const interval = setInterval(fetchIntersections, 3000);
     return () => clearInterval(interval);
-  }, [backendIp, intersections]);
+  }, [backendIp]);
+
+  useEffect(() => {
+    const fetchPhysicalLight = () => {
+      fetch(`${backendIp}/api/status`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.physical_light) {
+            setPhysicalLight(data.physical_light);
+          }
+        })
+        .catch(() => { /* el badge LIVE/LOCAL ya refleja la desconexion */ });
+    };
+
+    fetchPhysicalLight();
+    const interval = setInterval(fetchPhysicalLight, 1500);
+    return () => clearInterval(interval);
+  }, [backendIp]);
+
+  // ==========================================
+  // GLOSA REAL (Caso 2): distancia real GPS -> cruce inteligente real + fase/tiempo reales del backend
+  // ==========================================
+  useEffect(() => {
+    if (isDemoActive) return; // el modo practica offline guionado controla su propio glosaAdvisory/nextLight
+
+    const distanceMeters = haversineMeters(location, GLOSA_TARGET);
+    const userHasGreen = physicalLight.phase === GLOSA_USER_GREEN_PHASE;
+    const secondsToFlip = physicalLight.seconds_remaining || 0;
+    const etaSeconds = speed > 1 ? distanceMeters / (speed * 1000 / 3600) : null;
+
+    let msg = 'Estable';
+    if (userHasGreen) {
+      msg = (etaSeconds !== null && etaSeconds > secondsToFlip + 3)
+        ? 'Acelera ligeramente'
+        : 'Mantén velocidad, vas en onda verde';
+    } else {
+      msg = (etaSeconds !== null && etaSeconds < secondsToFlip)
+        ? 'Reduce la velocidad, evita llegar en rojo'
+        : 'Mantén velocidad, llegarás en verde';
+    }
+
+    setGlosaAdvisory({ active: true, speed: null, msg });
+    setNextLight({
+      id: GLOSA_TARGET.id,
+      status: userHasGreen ? 'VERDE' : 'ROJO',
+      timer: Math.round(secondsToFlip),
+      distance: Math.round(distanceMeters),
+    });
+  }, [location, speed, physicalLight, isDemoActive]);
 
   // Helper to run JS on Leaflet WebView
   const sendToMap = (code) => {
@@ -613,11 +682,6 @@ export default function App() {
                     <Text style={styles.favText}>Trabajo</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* DEMO BUTTON */}
-                <TouchableOpacity style={styles.demoStartBtn} onPress={startDemo}>
-                  <Text style={styles.demoStartBtnText}>🏎️ Iniciar Recorrido Demo</Text>
-                </TouchableOpacity>
               </View>
             )}
 
@@ -681,8 +745,10 @@ export default function App() {
                       glosaAdvisory.msg.includes('Acelera') ? styles.bgAmber : 
                       glosaAdvisory.msg.includes('Reduce') ? styles.bgRed : styles.bgGreen
                     ]}>
-                      <Text style={styles.glosaLabel}>ONDA VERDE ACTIVA</Text>
-                      <Text style={styles.glosaSpeedText}>Aconsejado: {glosaAdvisory.speed} km/h</Text>
+                      <Text style={styles.glosaLabel}>ONDA VERDE {isDemoActive ? '(PRACTICA)' : 'REAL'}</Text>
+                      {glosaAdvisory.speed != null && (
+                        <Text style={styles.glosaSpeedText}>Aconsejado: {glosaAdvisory.speed} km/h</Text>
+                      )}
                       <Text style={styles.glosaAdviceMsg}>{glosaAdvisory.msg}</Text>
                     </View>
                   ) : (
@@ -713,7 +779,7 @@ export default function App() {
                   <View style={styles.hudSmallCard}>
                     <Text style={styles.hudCardLabel}>DISTANCIA RESTANTE</Text>
                     <Text style={styles.hudCardValue}>{nextLight.distance} metros</Text>
-                    <Text style={styles.hudCardSub}>Destino: Rep. de Panamá</Text>
+                    <Text style={styles.hudCardSub}>Hacia: {nextLight.id}</Text>
                   </View>
                 </View>
 
@@ -822,6 +888,22 @@ export default function App() {
             <Text style={styles.settingsFormDesc}>
               Requerido para sincronizar semáforos reales con el dashboard central.
             </Text>
+          </View>
+
+          <View style={styles.settingOptionRow}>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.settingTitle}>Modo Práctica Offline</Text>
+              <Text style={styles.settingDesc}>
+                Recorrido guionado de demostración (no usa GPS ni datos reales). Apagado por defecto para no
+                mezclarse con el Mapa en Vivo y el Asesor de Onda Verde reales.
+              </Text>
+            </View>
+            <Switch
+              value={isDemoActive}
+              onValueChange={(val) => (val ? startDemo() : stopDemo())}
+              trackColor={{ false: '#475569', true: '#F4C430' }}
+              thumbColor={isDemoActive ? '#ffffff' : '#94a3b8'}
+            />
           </View>
 
           <View style={styles.creditsCard}>

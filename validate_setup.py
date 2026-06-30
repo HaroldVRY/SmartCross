@@ -15,7 +15,7 @@ dependencies = {
     "flask": "Flask",
     "cv2": "OpenCV (opencv-python)",
     "numpy": "NumPy",
-    "ultralytics": "Ultralytics YOLO"
+    "inference_sdk": "Roboflow Inference SDK"
 }
 
 missing_deps = []
@@ -93,25 +93,35 @@ for t_file in templates:
     else:
         print(f"    - [ERROR] {t_file}: NO ENCONTRADO [FALLÓ]")
 
-# 6. Check video file
-print("[*] Comprobando archivo de video...")
-if os.path.exists(config.VIDEO_PATH):
-    print(f"    - Video encontrado en: {config.VIDEO_PATH}")
-    try:
-        import cv2
-        cap = cv2.VideoCapture(config.VIDEO_PATH)
-        if cap.isOpened():
-            w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-            h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            print(f"    - OpenCV abrió el video: {int(w)}x{int(h)} @ {fps:.2f} FPS [OK]")
-            cap.release()
-        else:
-            print("    - [WARNING] OpenCV no pudo leer el video. Se usará Modo Simulación.")
-    except Exception as e:
-        print(f"    - [WARNING] Error probando OpenCV con video: {e}. Se usará Modo Simulación.")
+# 6. Check demo video files
+print("[*] Comprobando videos de demo (data/)...")
+any_video_found = False
+for video_key, video_path in config.AVAILABLE_VIDEOS.items():
+    if os.path.exists(video_path):
+        any_video_found = True
+        print(f"    - Video encontrado en: {video_path}")
+        try:
+            import cv2
+            cap = cv2.VideoCapture(video_path)
+            if cap.isOpened():
+                w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                h = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                fps = cap.get(cv2.CAP_PROP_FPS)
+                print(f"      '{video_key}': OpenCV abrió el video: {int(w)}x{int(h)} @ {fps:.2f} FPS [OK]")
+                cap.release()
+            else:
+                print(f"      [WARNING] OpenCV no pudo leer '{video_key}'.")
+        except Exception as e:
+            print(f"      [WARNING] Error probando OpenCV con '{video_key}': {e}")
+
+# 6.1 Check Roboflow API key (needed for real detection on Modulo 1)
+if config.ROBOFLOW_API_KEY:
+    print("    - ROBOFLOW_API_KEY: CONFIGURADA [OK]")
 else:
-    print(f"    - [INFO] Video no encontrado en {config.VIDEO_PATH}. Se activará el MODO SIMULACIÓN SINTÉTICA.")
+    print("    - [WARNING] ROBOFLOW_API_KEY no esta configurada (variable de entorno). La deteccion real no correra.")
+
+if not any_video_found:
+    print("    - [INFO] No se encontró ningún video en data/. Se activará el MODO SIMULACIÓN SINTÉTICA.")
 
 # 7. Check ROI Point-in-polygon logic
 print("[*] Validando lógica geométrica de OpenCV...")

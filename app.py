@@ -6,7 +6,7 @@ import threading
 import numpy as np
 from collections import deque
 from flask import Flask, render_template, Response, jsonify, request
-from ultralytics import YOLO
+from inference_sdk import InferenceHTTPClient
 
 import config
 
@@ -22,6 +22,19 @@ is_video_running = False
 current_active_intersection = "INT-01"
 intersection_lock = threading.Lock()
 
+# Which demo video (Modulo 1) is currently being played/processed
+current_video_key = config.DEFAULT_VIDEO_KEY
+video_key_lock = threading.Lock()
+
+# Latest vehicle detections produced asynchronously by roboflow_inference_thread.
+# Each item: {"class": str, "confidence": float, "cx": float, "cy": float, "points": np.ndarray}
+latest_detections_raw = []
+detections_lock = threading.Lock()
+
+# Clean (undrawn) frame handed off to roboflow_inference_thread for inference
+latest_clean_frame = None
+clean_frame_lock = threading.Lock()
+
 latest_status = {
     "lights": {
         "S1": {"count": 0, "status": "VERDE", "wait_time": 0, "recommended_extra_green": 0, "action": ""},
@@ -34,6 +47,11 @@ latest_status = {
         "pct_red": 0,
         "avg_wait": 0.0,
         "congestion_level": "BAJO"
+    },
+    "physical_light": {
+        "phase": "NS_GREEN",  # 'NS_GREEN' (S1/S2 con paso) or 'EW_GREEN' (S3/S4 con paso)
+        "seconds_remaining": 0,
+        "extended": False
     }
 }
 status_lock = threading.Lock()
@@ -179,7 +197,6 @@ class SimulatedVehicle:
     def __init__(self, lane, vtype):
         self.lane = lane # 'S1', 'S2', 'S3', 'S4'
         self.vtype = vtype # 'car', 'motorcycle', 'bus', 'truck'
-        self.class_id = {"car": 2, "motorcycle": 3, "bus": 5, "truck": 7}[vtype]
         self.speed = np.random.uniform(0.006, 0.009)
         self.stopped = False
         
@@ -325,11 +342,68 @@ class TrafficSimulator:
 
 
 # ==========================================
+# ROBOFLOW SERVERLESS INFERENCE THREAD (Modulo 1 - real detection)
+# ==========================================
+def roboflow_inference_thread():
+    """Calls the Roboflow workflow on a throttled cadence and caches the
+    parsed detections for video_processing_thread to draw/count.
+    Decoupled into its own thread because a serverless HTTP round-trip per
+    frame is too slow/expensive to run inline with the 30fps video loop."""
+    global latest_detections_raw
+
+    if not config.ROBOFLOW_API_KEY:
+        print("[Roboflow] ROBOFLOW_API_KEY no esta configurada (variable de entorno). "
+              "El hilo de inferencia real no correra; revisa el README.")
+        return
+
+    client = InferenceHTTPClient(api_url=config.ROBOFLOW_API_URL, api_key=config.ROBOFLOW_API_KEY)
+    interval = 1.0 / max(config.ROBOFLOW_CALLS_PER_SECOND, 0.1)
+
+    print(f"[Roboflow] Hilo de inferencia serverless iniciado (~{config.ROBOFLOW_CALLS_PER_SECOND} llamadas/seg).")
+
+    while True:
+        start_time = time.time()
+
+        with clean_frame_lock:
+            frame = None if latest_clean_frame is None else latest_clean_frame.copy()
+
+        if frame is not None:
+            try:
+                result = client.run_workflow(
+                    workspace_name=config.ROBOFLOW_WORKSPACE,
+                    workflow_id=config.ROBOFLOW_WORKFLOW_ID,
+                    images={"image": frame},
+                    parameters={"classes": config.ROBOFLOW_CLASSES},
+                    use_cache=True,
+                )
+                predictions = result[0]["predictions"]["predictions"]
+                parsed = []
+                for pred in predictions:
+                    points = np.array([[pt["x"], pt["y"]] for pt in pred["points"]], dtype=np.int32)
+                    parsed.append({
+                        "class": pred.get("class", "vehiculo"),
+                        "confidence": pred.get("confidence", 0.0),
+                        "cx": pred["x"],
+                        "cy": pred["y"],
+                        "points": points,
+                    })
+                with detections_lock:
+                    latest_detections_raw = parsed
+            except Exception as e:
+                print(f"[Roboflow] Error en inferencia (se mantiene la ultima deteccion valida): {e}")
+
+        elapsed = time.time() - start_time
+        sleep_time = interval - elapsed
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+
+
+# ==========================================
 # CORE VIDEO PROCESSING & INFERENCE THREAD
 # ==========================================
 def video_processing_thread():
-    global latest_frame, latest_status, yolo_status, is_video_running, current_active_intersection, intersections_data
-    
+    global latest_frame, latest_status, yolo_status, is_video_running, current_active_intersection, intersections_data, latest_clean_frame
+
     is_video_running = True
     print("[Thread] Hilo de video iniciado.")
 
@@ -341,87 +415,92 @@ def video_processing_thread():
         "S4": deque(maxlen=config.SMOOTHING_FRAMES),
     }
 
-    # Initial labels dictionary for COCO classes
-    coco_labels = {2: "Car", 3: "Moto", 5: "Bus", 7: "Truck"}
-    
     # Track simulated traffic light status for simulator closed-loop
     simulated_congested_status = {"S1": "VERDE", "S2": "VERDE", "S3": "VERDE", "S4": "VERDE"}
 
-    # 2. Check video file availability
-    use_synthetic = True
+    # 2. Check demo video availability (Modulo 1). Real detection runs via the
+    # separate roboflow_inference_thread; this thread only owns frame reading/drawing.
+    use_synthetic = not any(os.path.exists(p) for p in config.AVAILABLE_VIDEOS.values())
     cap = None
-    
-    if os.path.exists(config.VIDEO_PATH):
-        print(f"[Thread] Video detectado en {config.VIDEO_PATH}. Cargando modelo YOLOv8...")
-        yolo_status = "Cargando YOLOv8..."
-        try:
-            model = YOLO(config.MODEL_PATH)
-            cap = cv2.VideoCapture(config.VIDEO_PATH)
-            if cap.isOpened():
-                use_synthetic = False
-                yolo_status = "Modelo cargado"
-                print("[Thread] Video y YOLO cargados exitosamente. Detección real activa.")
-            else:
-                print("[Thread] No se pudo abrir el archivo de video. Cambiando a Simulación Sintética.")
-                yolo_status = "Video inaccesible. Usando Simulación."
-        except Exception as e:
-            print(f"[Thread] Error al cargar YOLO/Video: {e}. Cambiando a Simulación Sintética.")
-            yolo_status = "YOLO Error. Usando Simulación."
+    loaded_video_key = None
+
+    if use_synthetic:
+        print("[Thread] No se encontraron videos en data/. Iniciando Simulacion Sintetica de respaldo.")
+        yolo_status = "Simulacion Activa (sin video)"
     else:
-        print(f"[Thread] Archivo de video no encontrado en {config.VIDEO_PATH}. Iniciando Simulación Sintética.")
-        yolo_status = "Simulación Activa"
+        yolo_status = "Conectando a Roboflow..."
 
     # Initialize simulator
     simulator = TrafficSimulator()
-    
+
     # Dimensions for output frames
     width, height = 960, 540
     fluctuation_counter = 0
 
     while True:
         start_time = time.time()
-        
+
         # Load latest ROIs dynamically
         rois = load_rois()
 
+        # Advance the physical traffic-light phase/timer using last loop's congestion
+        # status. Runs in both modes so /api/status can expose a genuine "tiempo
+        # hasta el cambio de luz" even when driven by real Roboflow detections.
+        phys_phase, phys_timer, is_extended = simulator.update(simulated_congested_status)
+
         frame = None
+        # Each item: {"label": str, "conf": float, "cx": float, "cy": float, "points": np.ndarray}
         detections = []
 
         if not use_synthetic:
-            # REAL VIDEO MODE
-            ret, frame = cap.read()
-            if not ret:
-                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            # REAL VIDEO MODE (Modulo 1) - detections come from roboflow_inference_thread
+            with video_key_lock:
+                desired_key = current_video_key
+            desired_path = config.AVAILABLE_VIDEOS.get(desired_key)
+
+            if desired_key != loaded_video_key or cap is None:
+                if cap is not None:
+                    cap.release()
+                cap = cv2.VideoCapture(desired_path) if desired_path else None
+                loaded_video_key = desired_key
+                if cap is not None and cap.isOpened():
+                    yolo_status = f"Deteccion real activa (Roboflow) - {desired_key}"
+                    print(f"[Thread] Video '{desired_key}' cargado correctamente.")
+                else:
+                    yolo_status = "Video inaccesible."
+                    print(f"[Thread] No se pudo abrir '{desired_path}'.")
+
+            if cap is not None and cap.isOpened():
                 ret, frame = cap.read()
                 if not ret:
-                    time.sleep(0.1)
-                    continue
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ret, frame = cap.read()
+                    if not ret:
+                        time.sleep(0.1)
+                        continue
 
-            frame = cv2.resize(frame, (width, height))
+                frame = cv2.resize(frame, (width, height))
 
-            # YOLO Inference
-            try:
-                results = model.predict(
-                    source=frame,
-                    conf=config.CONFIDENCE_THRESHOLD,
-                    classes=config.COCO_CLASSES,
-                    verbose=False
-                )
-                
-                # Extract detections
-                for box in results[0].boxes:
-                    coords = box.xyxy[0].cpu().numpy() # [x1, y1, x2, y2]
-                    class_id = int(box.cls.cpu().numpy()[0])
-                    conf = float(box.conf.cpu().numpy()[0])
-                    
+                # Hand off a clean copy to the async Roboflow inference thread
+                with clean_frame_lock:
+                    latest_clean_frame = frame.copy()
+
+                # Use the most recently cached detections (updated a few times/sec, not every frame)
+                with detections_lock:
+                    raw_dets = list(latest_detections_raw)
+
+                for det in raw_dets:
                     detections.append({
-                        "box": coords,
-                        "class_id": class_id,
-                        "conf": conf
+                        "label": det["class"],
+                        "conf": det["confidence"],
+                        "cx": det["cx"],
+                        "cy": det["cy"],
+                        "points": det["points"],
                     })
-            except Exception as e:
-                print(f"[Thread] Error en inferencia YOLO: {e}")
-                cv2.putText(frame, "Inference Error", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                frame = np.zeros((height, width, 3), dtype=np.uint8)
+                cv2.putText(frame, "Esperando senal de video...", (40, height // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         else:
             # SYNTHETIC SIMULATION MODE
             frame = np.zeros((height, width, 3), dtype=np.uint8)
@@ -440,9 +519,6 @@ def video_processing_thread():
             cv2.line(frame, (int(width * 0.5), int(height * 0.68)), (int(width * 0.62), int(height * 0.68)), (255, 255, 255), 3) # S2 Sur
             cv2.line(frame, (int(width * 0.32), int(height * 0.5)), (int(width * 0.32), int(height * 0.62)), (255, 255, 255), 3) # S4 Oeste
             cv2.line(frame, (int(width * 0.68), int(height * 0.38)), (int(width * 0.68), int(height * 0.5)), (255, 255, 255), 3) # S3 Este
-
-            # Update traffic simulation
-            phys_phase, phys_timer, is_extended = simulator.update(simulated_congested_status)
 
             # Draw Physical traffic light status indicators on the roads
             s1_phys_color = (33, 161, 33) if phys_phase == "NS_GREEN" else (33, 33, 226)
@@ -466,7 +542,7 @@ def video_processing_thread():
             else:
                 cv2.putText(frame, timer_text, (width - 320, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
 
-            # Map simulator vehicles to detections
+            # Map simulator vehicles to detections (fallback-only path, no Roboflow involved)
             for v in simulator.vehicles:
                 if v.vtype == "car":
                     w_box, h_box = (25, 42) if v.lane in ['S1', 'S2'] else (42, 25)
@@ -476,17 +552,20 @@ def video_processing_thread():
                     w_box, h_box = (35, 75) if v.lane in ['S1', 'S2'] else (75, 35)
                 else: # truck
                     w_box, h_box = (38, 85) if v.lane in ['S1', 'S2'] else (85, 38)
-                
+
                 cx_px, cy_px = v.x * width, v.y * height
                 x1 = cx_px - w_box / 2
                 y1 = cy_px - h_box / 2
                 x2 = cx_px + w_box / 2
                 y2 = cy_px + h_box / 2
-                
+                points = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.int32)
+
                 detections.append({
-                    "box": [x1, y1, x2, y2],
-                    "class_id": v.class_id,
-                    "conf": 0.90 + np.random.uniform(0.01, 0.08)
+                    "label": v.vtype,
+                    "conf": 0.90 + np.random.uniform(0.01, 0.08),
+                    "cx": cx_px,
+                    "cy": cy_px,
+                    "points": points,
                 })
 
         # ==========================================
@@ -503,16 +582,12 @@ def video_processing_thread():
             else:
                 scaled_rois[r_id] = np.empty((0, 2), dtype=np.int32)
 
-        # Draw vehicle bounding boxes, labels, and calculate counts
+        # Draw vehicle oriented bounding boxes (OBB), labels, and calculate counts
         for det in detections:
-            x1, y1, x2, y2 = det["box"]
-            class_id = det["class_id"]
+            label = det["label"]
             conf = det["conf"]
-            label = coco_labels.get(class_id, "Vehículo")
-            
-            # Centroid
-            cx = int((x1 + x2) / 2)
-            cy = int((y1 + y2) / 2)
+            cx, cy = det["cx"], det["cy"]
+            points = det["points"]
 
             bbox_color = (200, 200, 200)
 
@@ -536,11 +611,16 @@ def video_processing_thread():
             elif assigned_roi == "S4":
                 bbox_color = (246, 130, 59) # Blue
 
-            # Draw bounding box and label
-            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), bbox_color, 2)
-            cv2.circle(frame, (cx, cy), 4, bbox_color, -1)
+            # Draw the oriented bounding box from the detection polygon (cv2.minAreaRect
+            # turns the Roboflow segmentation polygon, or the simulator's axis-aligned
+            # corners, into a true rotated rectangle)
+            if points is not None and len(points) >= 3:
+                rect = cv2.minAreaRect(points.astype(np.float32))
+                box_pts = cv2.boxPoints(rect).astype(np.int32)
+                cv2.polylines(frame, [box_pts], True, bbox_color, 2, cv2.LINE_AA)
+            cv2.circle(frame, (int(cx), int(cy)), 4, bbox_color, -1)
             text = f"{label} {conf:.2f}"
-            cv2.putText(frame, text, (int(x1), int(y1) - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.4, bbox_color, 1, cv2.LINE_AA)
+            cv2.putText(frame, text, (int(cx) - 20, int(cy) - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.4, bbox_color, 1, cv2.LINE_AA)
 
         # Draw ROIs on the frame with translucent overlay
         overlay = frame.copy()
@@ -653,6 +733,11 @@ def video_processing_thread():
                 "pct_red": pct_red,
                 "avg_wait": avg_wait,
                 "congestion_level": congestion_level
+            }
+            latest_status["physical_light"] = {
+                "phase": phys_phase,
+                "seconds_remaining": round(phys_timer / 30.0, 1),  # phase_timer is in frame-ticks at ~30fps
+                "extended": is_extended
             }
 
         # ==========================================
@@ -800,13 +885,37 @@ def api_save_rois():
     else:
         return jsonify({"success": False, "message": "Error escribiendo config.json"}), 500
 
+@app.route("/api/videos")
+def api_videos():
+    with video_key_lock:
+        selected = current_video_key
+    available = [key for key, path in config.AVAILABLE_VIDEOS.items() if os.path.exists(path)]
+    return jsonify({"available": available, "current": selected})
+
+@app.route("/api/select_video", methods=["POST"])
+def api_select_video():
+    global current_video_key
+    data = request.get_json()
+    video_key = data.get("video") if data else None
+
+    if video_key not in config.AVAILABLE_VIDEOS:
+        return jsonify({"success": False, "message": "Video desconocido"}), 400
+
+    with video_key_lock:
+        current_video_key = video_key
+
+    return jsonify({"success": True, "current": video_key})
+
 @app.route("/api/get_frame")
 def api_get_frame():
     rois = load_rois()
     width, height = 960, 540
-    
-    if os.path.exists(config.VIDEO_PATH):
-        cap = cv2.VideoCapture(config.VIDEO_PATH)
+
+    with video_key_lock:
+        active_video_path = config.AVAILABLE_VIDEOS.get(current_video_key)
+
+    if active_video_path and os.path.exists(active_video_path):
+        cap = cv2.VideoCapture(active_video_path)
         if cap.isOpened():
             ret, frame = cap.read()
             cap.release()
@@ -829,21 +938,22 @@ def api_get_frame():
     return "Error generating background", 500
 
 
-# Start the background thread on startup
-@app.before_request
-def start_processing():
+# Start the background threads on startup
+def start_background_threads():
     global is_video_running
     if not is_video_running:
-        t = threading.Thread(target=video_processing_thread, daemon=True)
-        t.start()
+        threading.Thread(target=video_processing_thread, daemon=True).start()
+        threading.Thread(target=roboflow_inference_thread, daemon=True).start()
         is_video_running = True
+
+
+@app.before_request
+def start_processing():
+    start_background_threads()
 
 
 if __name__ == "__main__":
-    if not is_video_running:
-        t = threading.Thread(target=video_processing_thread, daemon=True)
-        t.start()
-        is_video_running = True
-        
+    start_background_threads()
+
     print("Iniciando servidor Flask de SmartCross en http://localhost:5000")
     app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

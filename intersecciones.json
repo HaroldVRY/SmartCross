@@ -4,8 +4,8 @@
     "name": "Av. Javier Prado x Av. Arequipa",
     "lat": -12.0895,
     "lng": -77.0355,
-    "status": "ROJO",
-    "count": 8,
+    "status": "VERDE",
+    "count": 1,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -14,7 +14,7 @@
     "lat": -12.09,
     "lng": -77.037,
     "status": "ROJO",
-    "count": 12,
+    "count": 7,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -22,8 +22,8 @@
     "name": "Av. Javier Prado x Vía Expresa",
     "lat": -12.0915,
     "lng": -77.03,
-    "status": "AMARILLO",
-    "count": 5,
+    "status": "VERDE",
+    "count": 0,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -40,8 +40,8 @@
     "name": "Av. Javier Prado x Av. Salaverry",
     "lat": -12.0885,
     "lng": -77.047,
-    "status": "VERDE",
-    "count": 1,
+    "status": "AMARILLO",
+    "count": 5,
     "corridor": "Av. Javier Prado"
   },
   {
@@ -49,8 +49,8 @@
     "name": "Av. Canaval y Moreyra x Vía Expresa",
     "lat": -12.0955,
     "lng": -77.0265,
-    "status": "ROJO",
-    "count": 6,
+    "status": "VERDE",
+    "count": 0,
     "corridor": "Vía Expresa"
   },
   {
@@ -58,8 +58,8 @@
     "name": "Av. Aramburú x Vía Expresa",
     "lat": -12.0985,
     "lng": -77.0275,
-    "status": "ROJO",
-    "count": 7,
+    "status": "AMARILLO",
+    "count": 4,
     "corridor": "Vía Expresa"
   },
   {
@@ -67,8 +67,8 @@
     "name": "Av. Camino Real x Av. Santa Cruz",
     "lat": -12.1005,
     "lng": -77.038,
-    "status": "AMARILLO",
-    "count": 5,
+    "status": "ROJO",
+    "count": 10,
     "corridor": "Av. Camino Real"
   }
 ]

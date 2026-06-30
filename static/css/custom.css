@@ -156,11 +156,6 @@ body {
   background-color: #111b2d !important;
 }
 
-/* Inverts map colors to generate a dark slate theme */
-.leaflet-tile-container {
-  filter: invert(100%) hue-rotate(180deg) brightness(85%) contrast(100%);
-}
-
 .leaflet-container {
   font-family: 'Poppins', sans-serif !important;
   background-color: #111b2d !important;
@@ -180,6 +175,16 @@ body {
 
 .leaflet-bar a:hover {
   background-color: #21a179 !important;
+}
+
+.leaflet-control-attribution {
+  background-color: rgba(17, 27, 45, 0.75) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 9px !important;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(255, 255, 255, 0.65) !important;
 }
 
 /* Custom dark tooltips */

@@ -66,6 +66,13 @@
                     <span>CÁMARA VIVO — {{ intersection.name }}</span>
                 </span>
             </div>
+
+            <!-- Video Selector (Modulo 1: alternar entre los videos de demo disponibles) -->
+            <div id="video-selector" class="absolute top-4 right-4 z-10 bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-lg border border-white/10 flex items-center space-x-1.5">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide pl-1">Video</span>
+                <!-- Buttons populated dynamically from /api/videos -->
+                <div id="video-selector-buttons" class="flex items-center space-x-1.5"></div>
+            </div>
             <!-- Video Feed Stream (includes parameter for the route) -->
             <div class="flex-grow flex items-center justify-center bg-slate-950 overflow-hidden relative">
                 <img src="/video_feed?id={{ intersection.id }}" class="w-full h-full object-contain" alt="Feed de Video de Intersección" onerror="this.src='https://placehold.co/960x540/090d16/ffffff?text=Esperando+señal+de+video...';">

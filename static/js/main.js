@@ -6,7 +6,44 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initial API poll and start interval
     pollStatus();
     setInterval(pollStatus, 500); // Poll every 500ms for responsiveness
+
+    // Video selector (Modulo 1)
+    loadVideoSelector();
 });
+
+// Build the Video 1 / Video 2 selector buttons from /api/videos and wire clicks
+function loadVideoSelector() {
+    const container = document.getElementById("video-selector-buttons");
+    if (!container) return;
+
+    fetch("/api/videos")
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = "";
+            data.available.forEach(videoKey => {
+                const btn = document.createElement("button");
+                const isActive = videoKey === data.current;
+                btn.textContent = videoKey.replace("video", "Video ");
+                btn.className = isActive
+                    ? "text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white"
+                    : "text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-700/60 text-slate-300 hover:bg-slate-600";
+                btn.onclick = () => selectVideo(videoKey);
+                container.appendChild(btn);
+            });
+        })
+        .catch(err => console.error("Error cargando selector de video:", err));
+}
+
+function selectVideo(videoKey) {
+    fetch("/api/select_video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video: videoKey })
+    })
+        .then(res => res.json())
+        .then(() => loadVideoSelector())
+        .catch(err => console.error("Error seleccionando video:", err));
+}
 
 // Update the header clock
 function updateClock() {

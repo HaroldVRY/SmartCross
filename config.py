@@ -2,6 +2,24 @@ import os
 
 # Base paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_dotenv():
+    """Minimal .env loader so ROBOFLOW_API_KEY etc. don't need to be passed
+    inline on every command. .env is gitignored; never commit real secrets."""
+    env_path = os.path.join(BASE_DIR, ".env")
+    if not os.path.exists(env_path):
+        return
+    with open(env_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_dotenv()
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ROIS_PATH = os.path.join(BASE_DIR, "rois.json")
 INTERSECCIONES_PATH = os.path.join(BASE_DIR, "intersecciones.json")
@@ -10,12 +28,23 @@ INTERSECCIONES_PATH = os.path.join(BASE_DIR, "intersecciones.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Video Configurations
-VIDEO_PATH = os.path.join(DATA_DIR, "video.mp4")
+VIDEO_PATH = os.path.join(DATA_DIR, "video.mp4")  # Legacy single-video fallback path
 
-# YOLO Model Configurations
-MODEL_PATH = "yolov8n.pt"  # Will auto-download via Ultralytics
-CONFIDENCE_THRESHOLD = 0.25  # Confidence to detect vehicles
-COCO_CLASSES = [2, 3, 5, 7]  # car=2, motorcycle=3, bus=5, truck=7
+# Multiple demo videos selectable from the UI (Modulo 1)
+AVAILABLE_VIDEOS = {
+    "video1": os.path.join(DATA_DIR, "cruce_video_1.mp4"),
+    "video2": os.path.join(DATA_DIR, "cruce_video_2.mp4"),
+}
+DEFAULT_VIDEO_KEY = "video1"
+
+# Roboflow Inference Configurations (Modulo 1 - real vehicle detection)
+# Credentials are read from environment variables only - never hardcode the key here.
+ROBOFLOW_API_URL = os.environ.get("ROBOFLOW_API_URL", "https://serverless.roboflow.com")
+ROBOFLOW_API_KEY = os.environ.get("ROBOFLOW_API_KEY", "")
+ROBOFLOW_WORKSPACE = os.environ.get("ROBOFLOW_WORKSPACE", "harold-victor")
+ROBOFLOW_WORKFLOW_ID = os.environ.get("ROBOFLOW_WORKFLOW_ID", "general-segmentation-api")
+ROBOFLOW_CLASSES = "car, big bus, big truck"
+ROBOFLOW_CALLS_PER_SECOND = 3  # Throttle for the serverless inference thread
 
 # Congestion Thresholds
 UMBRAL_BAJO = 2   # counts <= 2 -> VERDE (Green)
